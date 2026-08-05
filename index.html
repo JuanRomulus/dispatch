@@ -5,37 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dispatch — Personal Dashboard</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#14120F">
+<meta name="theme-color" content="#0A1230">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#14120F;
-    --surface:#1E1B17;
-    --surface2:#262019;
-    --line:#3A3225;
-    --text:#EDE6D6;
-    --text-dim:#A69A82;
-    --text-faint:#6B6250;
-    --brass:#B08D57;
-    --brass-bright:#D4AF6A;
-    --ink-red:#8B3A3A;
-    --sage:#7C9070;
+    --bg:#0A1230;
+    --surface:#111C3F;
+    --surface2:#16254C;
+    --line:#28345F;
+    --text:#EAEEF9;
+    --text-dim:#9AABCE;
+    --text-faint:#5D6B93;
+    --brass:#C9A227;
+    --brass-bright:#F2C744;
+    --ink-red:#D96A6A;
+    --sage:#6FBF9C;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--bg);
     color:var(--text);
-    font-family:'Source Serif 4', Georgia, serif;
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
     padding-bottom:76px;
   }
-  ::selection{background:var(--brass); color:#14120F;}
+  ::selection{background:var(--brass); color:#0A1230;}
   a{color:var(--brass-bright);}
 
   .mono{font-family:'JetBrains Mono', ui-monospace, monospace;}
@@ -50,8 +50,8 @@
     display:flex; align-items:baseline; justify-content:space-between; gap:12px;
   }
   .wordmark{
-    font-family:'Fraunces', serif; font-weight:600; font-style:italic;
-    font-size:26px; letter-spacing:0.3px; color:var(--brass-bright);
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-style:normal;
+    font-size:25px; letter-spacing:-0.2px; color:var(--brass-bright);
   }
   .sync-dot{
     display:inline-flex; align-items:center; gap:6px;
@@ -145,7 +145,7 @@
   .add-row input[type="text"]{flex:1; min-width:0;}
   .add-row input[type="date"]{color-scheme:dark; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
   .btn{
-    background:var(--brass); color:#14120F; border:none; border-radius:3px;
+    background:var(--brass); color:#0A1230; border:none; border-radius:3px;
     padding:10px 14px; font-family:'JetBrains Mono', monospace; font-size:11.5px;
     text-transform:uppercase; letter-spacing:0.08em; cursor:pointer; font-weight:500;
   }
@@ -172,13 +172,13 @@
 
   textarea.note-input{
     width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--text);
-    border-radius:3px; padding:12px; font-family:'Source Serif 4', serif; font-size:15px;
+    border-radius:3px; padding:12px; font-family:'Inter', sans-serif; font-size:15px;
     resize:vertical; min-height:70px;
   }
 
   .agenda-day{margin-bottom:20px;}
   .agenda-day-label{
-    font-family:'Fraunces', serif; font-style:italic; font-weight:600;
+    font-family:'Space Grotesk', sans-serif; font-style:normal; font-weight:600;
     font-size:17px; color:var(--brass-bright); margin-bottom:8px;
   }
 
@@ -210,7 +210,7 @@
     .modal-backdrop{align-items:center;}
     .modal{border-radius:8px;}
   }
-  .modal h2{font-family:'Fraunces', serif; font-style:italic; font-weight:600; font-size:20px; margin:0 0 4px; color:var(--brass-bright);}
+  .modal h2{font-family:'Space Grotesk', sans-serif; font-style:normal; font-weight:600; font-size:20px; margin:0 0 4px; color:var(--brass-bright);}
   .modal p.hint{color:var(--text-dim); font-size:13px; line-height:1.5; margin:0 0 18px;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:6px;}
