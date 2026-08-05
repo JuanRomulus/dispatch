@@ -496,6 +496,29 @@
 
   document.getElementById("addNoteBtn").addEventListener("click", addNote);
 
+  // Some mobile keyboards render the Enter key as "Go"/"Search" on a bare
+  // <textarea> and swallow it instead of inserting a line break. Force a
+  // real newline ourselves so Enter always behaves as expected here.
+  function insertNewlineAtCursor(textarea) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    textarea.value = value.slice(0, start) + "\n" + value.slice(end);
+    textarea.selectionStart = textarea.selectionEnd = start + 1;
+  }
+  function handleTextareaEnter(e) {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      insertNewlineAtCursor(e.target);
+    }
+  }
+  noteInput.addEventListener("keydown", handleTextareaEnter);
+  notesList.addEventListener("keydown", (e) => {
+    if (e.target.classList && e.target.classList.contains("note-edit-input")) {
+      handleTextareaEnter(e);
+    }
+  });
+
   function addNote() {
     const text = noteInput.value.trim();
     if (!text) return;
@@ -523,7 +546,7 @@
         return `
           <div class="card note-card" data-id="${n.id}">
             <div class="item-meta">${meta}</div>
-            <textarea class="note-input note-edit-input" style="min-height:60px;">${escapeHtml(n.text)}</textarea>
+            <textarea class="note-input note-edit-input" style="min-height:60px;" enterkeyhint="enter">${escapeHtml(n.text)}</textarea>
             <div class="note-actions">
               <button data-action="save-note">Save</button>
               <button data-action="cancel-edit-note">Cancel</button>
