@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dispatch — Personal Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14120F">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14120F;
+    --surface:#1E1B17;
+    --surface2:#262019;
+    --line:#3A3225;
+    --text:#EDE6D6;
+    --text-dim:#A69A82;
+    --text-faint:#6B6250;
+    --brass:#B08D57;
+    --brass-bright:#D4AF6A;
+    --ink-red:#8B3A3A;
+    --sage:#7C9070;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Source Serif 4', Georgia, serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:76px;
+  }
+  ::selection{background:var(--brass); color:#14120F;}
+  a{color:var(--brass-bright);}
+
+  .mono{font-family:'JetBrains Mono', ui-monospace, monospace;}
+
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(180deg, var(--bg) 80%, transparent);
+    padding:18px 18px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  }
+  .wordmark{
+    font-family:'Fraunces', serif; font-weight:600; font-style:italic;
+    font-size:26px; letter-spacing:0.3px; color:var(--brass-bright);
+  }
+  .sync-dot{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono', monospace; font-size:10.5px;
+    color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em;
+    cursor:pointer; background:none; border:none; padding:4px;
+  }
+  .sync-dot .dot{width:6px; height:6px; border-radius:50%; background:var(--text-faint);}
+  .sync-dot.ok .dot{background:var(--sage);}
+  .sync-dot.pending .dot{background:var(--brass-bright); animation:pulse 1.2s infinite;}
+  .sync-dot.err .dot{background:var(--ink-red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+  .dateline{
+    margin-top:6px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-dim);
+    display:flex; align-items:center; gap:8px;
+  }
+  .dateline .rule{flex:1; height:1px; background:var(--line);}
+
+  nav.tabs{
+    display:flex; gap:2px; margin-top:14px;
+    overflow-x:auto; scrollbar-width:none;
+  }
+  nav.tabs::-webkit-scrollbar{display:none;}
+  nav.tabs button{
+    background:none; border:none; color:var(--text-faint);
+    font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    letter-spacing:0.1em; text-transform:uppercase;
+    padding:8px 12px 10px; cursor:pointer; white-space:nowrap;
+    border-bottom:2px solid transparent;
+  }
+  nav.tabs button.active{color:var(--brass-bright); border-bottom-color:var(--brass);}
+  nav.tabs button:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--brass-bright); outline-offset:2px;
+  }
+
+  main{padding:16px 18px 40px; max-width:640px; margin:0 auto;}
+  .page{display:none;}
+  .page.active{display:block; animation:rise 0.25s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .section-label{
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    letter-spacing:0.12em; text-transform:uppercase; color:var(--brass);
+    margin:22px 0 10px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label:first-child{margin-top:4px;}
+  .section-label .count{color:var(--text-faint); font-weight:400;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+  }
+
+  .item{
+    display:flex; align-items:flex-start; gap:11px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .item:last-child{border-bottom:none;}
+  .check{
+    width:17px; height:17px; border:1.5px solid var(--brass);
+    border-radius:2px; flex:none; margin-top:2px; cursor:pointer;
+    background:none; position:relative; padding:0;
+  }
+  .check.checked{background:var(--brass); }
+  .check.checked::after{
+    content:''; position:absolute; left:4px; top:0px; width:5px; height:9px;
+    border:solid var(--bg); border-width:0 2px 2px 0; transform:rotate(40deg);
+  }
+  .item-body{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.4; word-break:break-word;}
+  .item.done .item-text{color:var(--text-faint); text-decoration:line-through; text-decoration-color:var(--ink-red); text-decoration-thickness:1.5px;}
+  .item-meta{font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--text-faint); margin-top:3px; letter-spacing:0.03em;}
+  .item-meta.overdue{color:var(--ink-red);}
+  .item-del{
+    background:none; border:none; color:var(--text-faint); cursor:pointer;
+    font-size:15px; padding:2px 4px; flex:none; line-height:1;
+  }
+  .item-del:hover{color:var(--ink-red);}
+
+  .add-row{display:flex; gap:8px; margin-top:10px;}
+  .add-row input, .add-row select{
+    background:var(--surface2); border:1px solid var(--line); color:var(--text);
+    border-radius:3px; padding:10px 12px; font-family:inherit; font-size:14.5px;
+  }
+  .add-row input[type="text"]{flex:1; min-width:0;}
+  .add-row input[type="date"]{color-scheme:dark; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
+  .btn{
+    background:var(--brass); color:#14120F; border:none; border-radius:3px;
+    padding:10px 14px; font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:0.08em; cursor:pointer; font-weight:500;
+  }
+  .btn:hover{background:var(--brass-bright);}
+  .btn.ghost{background:none; border:1px solid var(--line); color:var(--text-dim);}
+  .btn.ghost:hover{border-color:var(--brass); color:var(--brass-bright);}
+  .btn.danger{background:none; border:1px solid var(--ink-red); color:var(--ink-red);}
+
+  .empty{
+    padding:26px 14px; text-align:center; color:var(--text-faint);
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em;
+  }
+
+  .note-card{padding:14px; margin-bottom:10px;}
+  .note-card .item-meta{margin-bottom:6px;}
+  .note-text{font-size:15px; line-height:1.55; white-space:pre-wrap;}
+  .note-actions{display:flex; gap:14px; margin-top:10px;}
+  .note-actions button{
+    background:none; border:none; color:var(--text-faint);
+    font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:0.08em; cursor:pointer; padding:0;
+  }
+  .note-actions button:hover{color:var(--brass-bright);}
+
+  textarea.note-input{
+    width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--text);
+    border-radius:3px; padding:12px; font-family:'Source Serif 4', serif; font-size:15px;
+    resize:vertical; min-height:70px;
+  }
+
+  .agenda-day{margin-bottom:20px;}
+  .agenda-day-label{
+    font-family:'Fraunces', serif; font-style:italic; font-weight:600;
+    font-size:17px; color:var(--brass-bright); margin-bottom:8px;
+  }
+
+  footer.tabbar{
+    position:fixed; bottom:0; left:0; right:0; z-index:20;
+    background:var(--surface); border-top:1px solid var(--line);
+    display:flex; padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  footer.tabbar button{
+    flex:1; background:none; border:none; color:var(--text-faint);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:6px 2px; cursor:pointer;
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase;
+  }
+  footer.tabbar button.active{color:var(--brass-bright);}
+  footer.tabbar svg{width:19px; height:19px; stroke:currentColor; fill:none; stroke-width:1.6;}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--surface); border:1px solid var(--line); border-radius:8px 8px 0 0;
+    width:100%; max-width:520px; padding:22px 20px calc(24px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+  }
+  @media(min-width:640px){
+    .modal-backdrop{align-items:center;}
+    .modal{border-radius:8px;}
+  }
+  .modal h2{font-family:'Fraunces', serif; font-style:italic; font-weight:600; font-size:20px; margin:0 0 4px; color:var(--brass-bright);}
+  .modal p.hint{color:var(--text-dim); font-size:13px; line-height:1.5; margin:0 0 18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:6px;}
+  .field input{
+    width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--text);
+    border-radius:3px; padding:11px 12px; font-family:'JetBrains Mono', monospace; font-size:13.5px;
+  }
+  .modal-actions{display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;}
+  .modal-close{
+    position:absolute; top:16px; right:18px; background:none; border:none;
+    color:var(--text-faint); font-size:20px; cursor:pointer; line-height:1;
+  }
+  .modal{position:relative;}
+
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(10px);
+    background:var(--surface2); border:1px solid var(--brass); color:var(--text);
+    padding:10px 16px; border-radius:4px; font-family:'JetBrains Mono', monospace; font-size:12px;
+    opacity:0; pointer-events:none; transition:opacity 0.25s, transform 0.25s; z-index:60;
+    max-width:88%; text-align:center;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .recur-toggle{display:flex; align-items:center; gap:8px; margin-top:4px;}
+  .recur-toggle input{width:auto;}
+  .recur-toggle label{font-size:12px; color:var(--text-dim); font-family:'JetBrains Mono', monospace; text-transform:none; letter-spacing:0;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="masthead">
+    <div class="wordmark">Dispatch</div>
+    <button class="sync-dot" id="syncIndicator" aria-label="Sync status, tap for settings">
+      <span class="dot"></span><span id="syncLabel">local only</span>
+    </button>
+  </div>
+  <div class="dateline">
+    <span id="datelinePlace">—</span><span class="rule"></span><span id="datelineDate">—</span>
+  </div>
+  <nav class="tabs" id="tabsNav">
+    <button data-page="today" class="active">Today</button>
+    <button data-page="lists">Lists</button>
+    <button data-page="dates">Dates</button>
+    <button data-page="notes">Notes</button>
+  </nav>
+</header>
+
+<main>
+  <!-- TODAY -->
+  <section class="page active" id="page-today"></section>
+
+  <!-- LISTS -->
+  <section class="page" id="page-lists">
+    <div class="section-label">Reminders <span class="count" id="remindersCount"></span></div>
+    <div class="card" id="remindersList"></div>
+    <div class="add-row">
+      <input type="text" id="reminderInput" placeholder="Add a reminder…" maxlength="200">
+      <input type="date" id="reminderDate">
+    </div>
+    <button class="btn" id="addReminderBtn" style="margin-top:8px;">File</button>
+
+    <div class="section-label" style="margin-top:32px;">Shopping list <span class="count" id="shoppingCount"></span></div>
+    <div class="card" id="shoppingList"></div>
+    <div class="add-row">
+      <input type="text" id="shoppingInput" placeholder="Add an item…" maxlength="200">
+    </div>
+    <button class="btn" id="addShoppingBtn" style="margin-top:8px;">Add</button>
+  </section>
+
+  <!-- DATES -->
+  <section class="page" id="page-dates">
+    <div class="section-label">Significant dates <span class="count" id="datesCount"></span></div>
+    <div class="card" id="datesList"></div>
+    <div class="add-row" style="flex-wrap:wrap;">
+      <input type="text" id="dateLabelInput" placeholder="What's the occasion?" maxlength="200" style="flex:1 1 100%;">
+    </div>
+    <div class="add-row" style="margin-top:8px;">
+      <input type="date" id="dateValueInput">
+      <div class="recur-toggle">
+        <input type="checkbox" id="dateRecurring" checked>
+        <label for="dateRecurring">Repeats yearly</label>
+      </div>
+    </div>
+    <button class="btn" id="addDateBtn" style="margin-top:8px;">Mark it</button>
+  </section>
+
+  <!-- NOTES -->
+  <section class="page" id="page-notes">
+    <div class="section-label">Quick notes <span class="count" id="notesCount"></span></div>
+    <textarea class="note-input" id="noteInput" placeholder="Jot something down…"></textarea>
+    <button class="btn" id="addNoteBtn" style="margin-top:8px;">Save note</button>
+    <div id="notesList" style="margin-top:22px;"></div>
+  </section>
+</main>
+
+<footer class="tabbar" id="tabbarBottom">
+  <button data-page="today" class="active">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    Today
+  </button>
+  <button data-page="lists">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    Lists
+  </button>
+  <button data-page="dates">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+    Dates
+  </button>
+  <button data-page="notes">
+    <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M9 9h7M9 13h7M9 17h4"/></svg>
+    Notes
+  </button>
+</footer>
+
+<div class="modal-backdrop" id="settingsBackdrop">
+  <div class="modal">
+    <button class="modal-close" id="closeSettings" aria-label="Close">&times;</button>
+    <h2>Sync settings</h2>
+    <p class="hint">Data syncs to a private GitHub repo you own, via a personal access token stored only in this browser. It's never sent anywhere else. Leave blank to use this device only.</p>
+    <div class="field">
+      <label for="ghOwner">GitHub username</label>
+      <input type="text" id="ghOwner" autocomplete="off" spellcheck="false" placeholder="e.g. juanromulus">
+    </div>
+    <div class="field">
+      <label for="ghRepo">Repository name</label>
+      <input type="text" id="ghRepo" autocomplete="off" spellcheck="false" placeholder="e.g. dispatch-data">
+    </div>
+    <div class="field">
+      <label for="ghPath">File path in repo</label>
+      <input type="text" id="ghPath" autocomplete="off" spellcheck="false" placeholder="data.json" value="data.json">
+    </div>
+    <div class="field">
+      <label for="ghToken">Personal access token (fine-grained, contents: read/write)</label>
+      <input type="password" id="ghToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="saveSyncBtn">Save &amp; sync now</button>
+      <button class="btn ghost" id="testSyncBtn">Test connection</button>
+      <button class="btn danger" id="clearSyncBtn">Disconnect</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
