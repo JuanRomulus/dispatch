@@ -288,6 +288,7 @@
   const datesCount = document.getElementById("datesCount");
   const dateLabelInput = document.getElementById("dateLabelInput");
   const dateValueInput = document.getElementById("dateValueInput");
+  const dateTimeInput = document.getElementById("dateTimeInput");
   const dateRecurring = document.getElementById("dateRecurring");
 
   document.getElementById("addDateBtn").addEventListener("click", addDate);
@@ -300,10 +301,12 @@
       id: uid(),
       label,
       date: value,
+      time: dateTimeInput.value || null,
       recurring: dateRecurring.checked,
     });
     dateLabelInput.value = "";
     dateValueInput.value = "";
+    dateTimeInput.value = "";
     dateRecurring.checked = true;
     saveState();
     toast("Marked.");
@@ -326,11 +329,13 @@
       if (days === 0) meta = "today";
       else if (days === 1) meta = "tomorrow";
       else meta = `in ${days} days · ${fmtDate(d._next)}`;
+      const timeLabel = d.time ? formatTime(d.time) : "";
+      const fullMeta = [meta, timeLabel, d.recurring ? "yearly" : ""].filter(Boolean).join(" · ");
       return `
         <div class="item" data-id="${d.id}">
           <div class="item-body">
             <div class="item-text">${escapeHtml(d.label)}</div>
-            <div class="item-meta">${meta}${d.recurring ? " · yearly" : ""}</div>
+            <div class="item-meta">${fullMeta}</div>
           </div>
           <button class="item-del" data-action="delete-date" aria-label="Delete">&times;</button>
         </div>`;
@@ -361,6 +366,8 @@
     toast("Saved.");
   }
 
+  let editingNoteId = null;
+
   function renderNotes() {
     notesCount.textContent = state.notes.length ? `· ${state.notes.length}` : "";
 
@@ -372,11 +379,25 @@
     notesList.innerHTML = state.notes.map((n) => {
       const d = new Date(n.createdAt);
       const meta = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+      if (n.id === editingNoteId) {
+        return `
+          <div class="card note-card" data-id="${n.id}">
+            <div class="item-meta">${meta}</div>
+            <textarea class="note-input note-edit-input" style="min-height:60px;">${escapeHtml(n.text)}</textarea>
+            <div class="note-actions">
+              <button data-action="save-note">Save</button>
+              <button data-action="cancel-edit-note">Cancel</button>
+            </div>
+          </div>`;
+      }
+
       return `
         <div class="card note-card" data-id="${n.id}">
           <div class="item-meta">${meta}</div>
           <div class="note-text">${escapeHtml(n.text)}</div>
           <div class="note-actions">
+            <button data-action="edit-note">Edit</button>
             <button data-action="delete-note">Delete</button>
           </div>
         </div>`;
@@ -386,9 +407,27 @@
   notesList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const id = btn.closest(".note-card").dataset.id;
+    const card = btn.closest(".note-card");
+    const id = card.dataset.id;
+
     if (btn.dataset.action === "delete-note") {
       state.notes = state.notes.filter((x) => x.id !== id);
+      if (editingNoteId === id) editingNoteId = null;
+      saveState();
+    } else if (btn.dataset.action === "edit-note") {
+      editingNoteId = id;
+      renderNotes();
+    } else if (btn.dataset.action === "cancel-edit-note") {
+      editingNoteId = null;
+      renderNotes();
+    } else if (btn.dataset.action === "save-note") {
+      const textarea = card.querySelector(".note-edit-input");
+      const newText = textarea.value.trim();
+      if (newText) {
+        const note = state.notes.find((x) => x.id === id);
+        if (note) note.text = newText;
+      }
+      editingNoteId = null;
       saveState();
     }
   });
@@ -423,7 +462,9 @@
     if (upcomingDates.length) {
       groups.push(agendaGroup("Coming up", upcomingDates.map((d) => {
         const days = daysBetween(t, d._next);
-        const meta = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+        const dayLabel = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+        const timeLabel = d.time ? formatTime(d.time) : "";
+        const meta = [dayLabel, timeLabel].filter(Boolean).join(" · ");
         return `<div class="item"><div class="item-body"><div class="item-text">${escapeHtml(d.label)}</div><div class="item-meta">${meta}</div></div></div>`;
       })));
     }
@@ -435,7 +476,7 @@
     }
 
     if (openShopping) {
-      html += `<div class="section-label" style="margin-top:28px;">Shopping list <span class="count">· ${openShopping} open</span></div>`;
+      html += `<div class="section-label" style="margin-top:28px;">Things to do <span class="count">· ${openShopping} open</span></div>`;
     }
 
     pageToday.innerHTML = html;
@@ -475,6 +516,142 @@
     saveState();
   });
 
+  // ---------- CALENDAR ----------
+  // Renders straight from the same state.reminders/state.dates used
+  // everywhere else — there is no separate calendar data, so it's always
+  // in sync with Today/Lists/Dates and with whatever comes down from
+  // GitHub sync.
+  const calTitle = document.getElementById("calTitle");
+  const calWeekdays = document.getElementById("calWeekdays");
+  const calGrid = document.getElementById("calGrid");
+  const calAgendaLabel = document.getElementById("calAgendaLabel");
+  const calAgenda = document.getElementById("calAgenda");
+
+  let calendarViewDate = new Date();
+  calendarViewDate.setDate(1);
+  let selectedCalendarDay = todayISO();
+
+  const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  document.getElementById("calPrevBtn").addEventListener("click", () => {
+    calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById("calNextBtn").addEventListener("click", () => {
+    calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+    renderCalendar();
+  });
+
+  function itemsForDay(iso) {
+    const [, im, iday] = iso.split("-");
+    const reminders = state.reminders.filter((r) => r.date === iso);
+    const dates = state.dates.filter((d) => {
+      if (d.recurring) {
+        const [, m, day] = d.date.split("-");
+        return m === im && day === iday;
+      }
+      return d.date === iso;
+    });
+    return { reminders, dates };
+  }
+
+  function renderCalendar() {
+    if (!calWeekdays.childElementCount) {
+      calWeekdays.innerHTML = WEEKDAY_LABELS.map((w) => `<span>${w}</span>`).join("");
+    }
+
+    const year = calendarViewDate.getFullYear();
+    const month = calendarViewDate.getMonth();
+    calTitle.textContent = calendarViewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+    const firstOfMonth = new Date(year, month, 1);
+    const startOffset = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const cells = [];
+    for (let i = startOffset - 1; i >= 0; i--) {
+      cells.push({ date: new Date(year, month - 1, daysInPrevMonth - i), otherMonth: true });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ date: new Date(year, month, d), otherMonth: false });
+    }
+    while (cells.length % 7 !== 0) {
+      const last = cells[cells.length - 1].date;
+      const next = new Date(last);
+      next.setDate(next.getDate() + 1);
+      cells.push({ date: next, otherMonth: true });
+    }
+
+    const t = todayISO();
+    calGrid.innerHTML = cells.map(({ date, otherMonth }) => {
+      const iso = toLocalISO(date);
+      const { reminders, dates } = itemsForDay(iso);
+      const classes = ["cal-day"];
+      if (otherMonth) classes.push("other-month");
+      if (iso === t) classes.push("today");
+      if (iso === selectedCalendarDay) classes.push("selected");
+      const dots = [];
+      if (reminders.length) dots.push(`<span class="cal-dot reminder"></span>`);
+      if (dates.length) dots.push(`<span class="cal-dot date"></span>`);
+      return `
+        <button class="${classes.join(" ")}" data-date="${iso}">
+          <span class="num">${date.getDate()}</span>
+          <span class="cal-dots">${dots.join("")}</span>
+        </button>`;
+    }).join("");
+
+    renderCalendarAgenda();
+  }
+
+  function renderCalendarAgenda() {
+    if (!selectedCalendarDay) {
+      calAgendaLabel.textContent = "Tap a day";
+      calAgenda.innerHTML = `<div class="empty">Select a day on the calendar.</div>`;
+      return;
+    }
+
+    const [y, m, d] = selectedCalendarDay.split("-").map(Number);
+    calAgendaLabel.textContent = new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      weekday: "long", day: "numeric", month: "long",
+    });
+
+    const { reminders, dates } = itemsForDay(selectedCalendarDay);
+    const rows = [];
+
+    reminders.forEach((r) => {
+      const timeLabel = r.time ? formatTime(r.time) : "";
+      rows.push(`
+        <div class="item ${r.done ? "done" : ""}">
+          <div class="item-body">
+            <div class="item-text">${escapeHtml(r.text)}</div>
+            ${timeLabel ? `<div class="item-meta">${timeLabel}</div>` : ""}
+          </div>
+        </div>`);
+    });
+
+    dates.forEach((dt) => {
+      const timeLabel = dt.time ? formatTime(dt.time) : "";
+      const meta = [timeLabel, dt.recurring ? "yearly" : ""].filter(Boolean).join(" · ");
+      rows.push(`
+        <div class="item">
+          <div class="item-body">
+            <div class="item-text">${escapeHtml(dt.label)}</div>
+            ${meta ? `<div class="item-meta">${meta}</div>` : ""}
+          </div>
+        </div>`);
+    });
+
+    calAgenda.innerHTML = rows.length ? rows.join("") : `<div class="empty">Nothing on this day.</div>`;
+  }
+
+  calGrid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".cal-day");
+    if (!btn) return;
+    selectedCalendarDay = btn.dataset.date;
+    renderCalendar();
+  });
+
   // ---------- escape ----------
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -489,6 +666,7 @@
     renderDates();
     renderNotes();
     renderToday();
+    renderCalendar();
   }
 
   // ---------- SETTINGS / SYNC ----------
