@@ -176,6 +176,8 @@
     toast("Filed.");
   }
 
+  let editingReminderId = null;
+
   function renderReminders() {
     const open = state.reminders.filter((r) => !r.done);
     remindersCount.textContent = open.length ? `· ${open.length}` : "";
@@ -199,6 +201,25 @@
 
     const now = new Date();
     remindersList.innerHTML = sorted.map((r) => {
+      if (r.id === editingReminderId) {
+        return `
+          <div class="item editing" data-id="${r.id}">
+            <div class="item-body">
+              <div class="add-row" style="margin:0;">
+                <input type="text" class="edit-text-input" value="${escapeAttr(r.text)}" style="flex:1;">
+              </div>
+              <div class="add-row" style="margin-top:8px;">
+                <input type="date" class="edit-date-input" value="${r.date || ""}">
+                <input type="time" class="edit-time-input" value="${r.time || ""}">
+              </div>
+              <div class="note-actions" style="margin-top:8px;">
+                <button data-action="save-reminder">Save</button>
+                <button data-action="cancel-edit-reminder">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+      }
+
       const moment = reminderMoment(r);
       const overdue = !!moment && !r.done && moment < now;
       const isToday = r.date === todayISO();
@@ -215,6 +236,7 @@
             <div class="item-text">${escapeHtml(r.text)}</div>
             ${meta ? `<div class="item-meta ${overdue ? "overdue" : ""}">${meta}</div>` : ""}
           </div>
+          <button class="item-edit" data-action="edit-reminder" aria-label="Edit">&#9998;</button>
           <button class="item-del" data-action="delete-reminder" aria-label="Delete">&times;</button>
         </div>`;
     }).join("");
@@ -223,13 +245,37 @@
   remindersList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const id = btn.closest(".item").dataset.id;
-    if (btn.dataset.action === "toggle-reminder") {
+    const item = btn.closest(".item");
+    const id = item.dataset.id;
+    const action = btn.dataset.action;
+
+    if (action === "toggle-reminder") {
       const r = state.reminders.find((x) => x.id === id);
       if (r) r.done = !r.done;
       saveState();
-    } else if (btn.dataset.action === "delete-reminder") {
+    } else if (action === "delete-reminder") {
       state.reminders = state.reminders.filter((x) => x.id !== id);
+      if (editingReminderId === id) editingReminderId = null;
+      saveState();
+    } else if (action === "edit-reminder") {
+      editingReminderId = id;
+      renderReminders();
+    } else if (action === "cancel-edit-reminder") {
+      editingReminderId = null;
+      renderReminders();
+    } else if (action === "save-reminder") {
+      const text = item.querySelector(".edit-text-input").value.trim();
+      const dateVal = item.querySelector(".edit-date-input").value;
+      const timeVal = item.querySelector(".edit-time-input").value;
+      if (text) {
+        const r = state.reminders.find((x) => x.id === id);
+        if (r) {
+          r.text = text;
+          r.date = dateVal || null;
+          r.time = dateVal ? (timeVal || null) : null;
+        }
+      }
+      editingReminderId = null;
       saveState();
     }
   });
@@ -250,6 +296,8 @@
     saveState();
   }
 
+  let editingShoppingId = null;
+
   function renderShopping() {
     const open = state.shopping.filter((s) => !s.done);
     shoppingCount.textContent = open.length ? `· ${open.length}` : "";
@@ -261,24 +309,59 @@
       return;
     }
 
-    shoppingList.innerHTML = sorted.map((s) => `
-      <div class="item ${s.done ? "done" : ""}" data-id="${s.id}">
-        <button class="check ${s.done ? "checked" : ""}" data-action="toggle-shopping" aria-label="Toggle done"></button>
-        <div class="item-body"><div class="item-text">${escapeHtml(s.text)}</div></div>
-        <button class="item-del" data-action="delete-shopping" aria-label="Delete">&times;</button>
-      </div>`).join("");
+    shoppingList.innerHTML = sorted.map((s) => {
+      if (s.id === editingShoppingId) {
+        return `
+          <div class="item editing" data-id="${s.id}">
+            <div class="item-body">
+              <div class="add-row" style="margin:0;">
+                <input type="text" class="edit-text-input" value="${escapeAttr(s.text)}" style="flex:1;">
+              </div>
+              <div class="note-actions" style="margin-top:8px;">
+                <button data-action="save-shopping">Save</button>
+                <button data-action="cancel-edit-shopping">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="item ${s.done ? "done" : ""}" data-id="${s.id}">
+          <button class="check ${s.done ? "checked" : ""}" data-action="toggle-shopping" aria-label="Toggle done"></button>
+          <div class="item-body"><div class="item-text">${escapeHtml(s.text)}</div></div>
+          <button class="item-edit" data-action="edit-shopping" aria-label="Edit">&#9998;</button>
+          <button class="item-del" data-action="delete-shopping" aria-label="Delete">&times;</button>
+        </div>`;
+    }).join("");
   }
 
   shoppingList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const id = btn.closest(".item").dataset.id;
-    if (btn.dataset.action === "toggle-shopping") {
+    const item = btn.closest(".item");
+    const id = item.dataset.id;
+    const action = btn.dataset.action;
+
+    if (action === "toggle-shopping") {
       const s = state.shopping.find((x) => x.id === id);
       if (s) s.done = !s.done;
       saveState();
-    } else if (btn.dataset.action === "delete-shopping") {
+    } else if (action === "delete-shopping") {
       state.shopping = state.shopping.filter((x) => x.id !== id);
+      if (editingShoppingId === id) editingShoppingId = null;
+      saveState();
+    } else if (action === "edit-shopping") {
+      editingShoppingId = id;
+      renderShopping();
+    } else if (action === "cancel-edit-shopping") {
+      editingShoppingId = null;
+      renderShopping();
+    } else if (action === "save-shopping") {
+      const val = item.querySelector(".edit-text-input").value.trim();
+      if (val) {
+        const s = state.shopping.find((x) => x.id === id);
+        if (s) s.text = val;
+      }
+      editingShoppingId = null;
       saveState();
     }
   });
@@ -312,6 +395,8 @@
     toast("Marked.");
   }
 
+  let editingDateId = null;
+
   function renderDates() {
     datesCount.textContent = state.dates.length ? `· ${state.dates.length}` : "";
 
@@ -324,6 +409,31 @@
     }
 
     datesList.innerHTML = withNext.map((d) => {
+      if (d.id === editingDateId) {
+        return `
+          <div class="item editing" data-id="${d.id}">
+            <div class="item-body">
+              <div class="add-row" style="margin:0; flex-wrap:wrap;">
+                <input type="text" class="edit-text-input" value="${escapeAttr(d.label)}" style="flex:1 1 100%;">
+              </div>
+              <div class="add-row" style="margin-top:8px;">
+                <input type="date" class="edit-date-input" value="${d.date || ""}">
+                <input type="time" class="edit-time-input" value="${d.time || ""}">
+              </div>
+              <div class="add-row" style="margin-top:8px;">
+                <div class="recur-toggle">
+                  <input type="checkbox" class="edit-recurring-input" ${d.recurring ? "checked" : ""}>
+                  <label>Repeats yearly</label>
+                </div>
+              </div>
+              <div class="note-actions" style="margin-top:8px;">
+                <button data-action="save-date">Save</button>
+                <button data-action="cancel-edit-date">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+      }
+
       const days = daysBetween(todayISO(), d._next);
       let meta;
       if (days === 0) meta = "today";
@@ -337,6 +447,7 @@
             <div class="item-text">${escapeHtml(d.label)}</div>
             <div class="item-meta">${fullMeta}</div>
           </div>
+          <button class="item-edit" data-action="edit-date" aria-label="Edit">&#9998;</button>
           <button class="item-del" data-action="delete-date" aria-label="Delete">&times;</button>
         </div>`;
     }).join("");
@@ -345,9 +456,37 @@
   datesList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const id = btn.closest(".item").dataset.id;
-    state.dates = state.dates.filter((x) => x.id !== id);
-    saveState();
+    const item = btn.closest(".item");
+    const id = item.dataset.id;
+    const action = btn.dataset.action;
+
+    if (action === "delete-date") {
+      state.dates = state.dates.filter((x) => x.id !== id);
+      if (editingDateId === id) editingDateId = null;
+      saveState();
+    } else if (action === "edit-date") {
+      editingDateId = id;
+      renderDates();
+    } else if (action === "cancel-edit-date") {
+      editingDateId = null;
+      renderDates();
+    } else if (action === "save-date") {
+      const label = item.querySelector(".edit-text-input").value.trim();
+      const dateVal = item.querySelector(".edit-date-input").value;
+      const timeVal = item.querySelector(".edit-time-input").value;
+      const recurring = item.querySelector(".edit-recurring-input").checked;
+      if (label && dateVal) {
+        const d = state.dates.find((x) => x.id === id);
+        if (d) {
+          d.label = label;
+          d.date = dateVal;
+          d.time = timeVal || null;
+          d.recurring = recurring;
+        }
+      }
+      editingDateId = null;
+      saveState();
+    }
   });
 
   // ---------- NOTES ----------
@@ -657,6 +796,10 @@
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str).replace(/"/g, "&quot;");
   }
 
   // ---------- render all ----------
