@@ -39,6 +39,66 @@
     return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
 
+  // ---------- multi-line text fields ----------
+  // Every free-text field in the app (reminder text, things-to-do text,
+  // significant-date label, notes, and all their inline "edit" versions)
+  // is a <textarea> so Enter can insert a line break rather than being
+  // swallowed by a single-line <input>. Adding always happens via the
+  // explicit File/Add/Save button, never via Enter.
+  //
+  // `beforeinput` reliably reports what a virtual/mobile keyboard is about
+  // to do (inputType: "insertLineBreak") even in cases where keydown
+  // reports an unreliable/placeholder key for on-screen keyboards, which is
+  // why we intercept it here rather than relying on keydown alone.
+  const MULTILINE_FIELD_SELECTOR =
+    "#noteInput, #reminderInput, #shoppingInput, #dateLabelInput, .note-edit-input, .edit-text-input";
+
+  function isMultilineField(el) {
+    return !!(el && el.matches && el.matches(MULTILINE_FIELD_SELECTOR));
+  }
+
+  function insertNewlineAtCursor(textarea) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    textarea.value = value.slice(0, start) + "\n" + value.slice(end);
+    textarea.selectionStart = textarea.selectionEnd = start + 1;
+    autoGrowTextarea(textarea);
+  }
+
+  function autoGrowTextarea(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }
+
+  document.addEventListener("beforeinput", (e) => {
+    if (!isMultilineField(e.target)) return;
+    if (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph") {
+      e.preventDefault();
+      insertNewlineAtCursor(e.target);
+    }
+  });
+
+  // Fallback for the rare browser without beforeinput inputType support.
+  const supportsBeforeInputTypes =
+    typeof window.InputEvent === "function" && "inputType" in window.InputEvent.prototype;
+  document.addEventListener("keydown", (e) => {
+    if (supportsBeforeInputTypes) return;
+    if (!isMultilineField(e.target)) return;
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      insertNewlineAtCursor(e.target);
+    }
+  });
+
+  document.addEventListener("input", (e) => {
+    if (isMultilineField(e.target)) autoGrowTextarea(e.target);
+  });
+
+  function autoGrowAllMultilineFields() {
+    document.querySelectorAll(MULTILINE_FIELD_SELECTOR).forEach(autoGrowTextarea);
+  }
+
   // ---------- state ----------
   let state = loadState();
   let syncCfg = loadSyncCfg();
@@ -157,7 +217,6 @@
   const reminderTime = document.getElementById("reminderTime");
 
   document.getElementById("addReminderBtn").addEventListener("click", addReminder);
-  reminderInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addReminder(); });
 
   function addReminder() {
     const text = reminderInput.value.trim();
@@ -206,7 +265,7 @@
           <div class="item editing" data-id="${r.id}">
             <div class="item-body">
               <div class="add-row" style="margin:0;">
-                <input type="text" class="edit-text-input" value="${escapeAttr(r.text)}" style="flex:1;">
+                <textarea class="edit-text-input" rows="1" style="flex:1;" enterkeyhint="enter">${escapeHtml(r.text)}</textarea>
               </div>
               <div class="add-row" style="margin-top:8px;">
                 <input type="date" class="edit-date-input" value="${r.date || ""}">
@@ -286,7 +345,6 @@
   const shoppingInput = document.getElementById("shoppingInput");
 
   document.getElementById("addShoppingBtn").addEventListener("click", addShopping);
-  shoppingInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addShopping(); });
 
   function addShopping() {
     const text = shoppingInput.value.trim();
@@ -315,7 +373,7 @@
           <div class="item editing" data-id="${s.id}">
             <div class="item-body">
               <div class="add-row" style="margin:0;">
-                <input type="text" class="edit-text-input" value="${escapeAttr(s.text)}" style="flex:1;">
+                <textarea class="edit-text-input" rows="1" style="flex:1;" enterkeyhint="enter">${escapeHtml(s.text)}</textarea>
               </div>
               <div class="note-actions" style="margin-top:8px;">
                 <button data-action="save-shopping">Save</button>
@@ -414,7 +472,7 @@
           <div class="item editing" data-id="${d.id}">
             <div class="item-body">
               <div class="add-row" style="margin:0; flex-wrap:wrap;">
-                <input type="text" class="edit-text-input" value="${escapeAttr(d.label)}" style="flex:1 1 100%;">
+                <textarea class="edit-text-input" rows="1" style="flex:1 1 100%;" enterkeyhint="enter">${escapeHtml(d.label)}</textarea>
               </div>
               <div class="add-row" style="margin-top:8px;">
                 <input type="date" class="edit-date-input" value="${d.date || ""}">
@@ -495,29 +553,6 @@
   const noteInput = document.getElementById("noteInput");
 
   document.getElementById("addNoteBtn").addEventListener("click", addNote);
-
-  // Some mobile keyboards render the Enter key as "Go"/"Search" on a bare
-  // <textarea> and swallow it instead of inserting a line break. Force a
-  // real newline ourselves so Enter always behaves as expected here.
-  function insertNewlineAtCursor(textarea) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const value = textarea.value;
-    textarea.value = value.slice(0, start) + "\n" + value.slice(end);
-    textarea.selectionStart = textarea.selectionEnd = start + 1;
-  }
-  function handleTextareaEnter(e) {
-    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      insertNewlineAtCursor(e.target);
-    }
-  }
-  noteInput.addEventListener("keydown", handleTextareaEnter);
-  notesList.addEventListener("keydown", (e) => {
-    if (e.target.classList && e.target.classList.contains("note-edit-input")) {
-      handleTextareaEnter(e);
-    }
-  });
 
   function addNote() {
     const text = noteInput.value.trim();
@@ -833,6 +868,7 @@
     renderNotes();
     renderToday();
     renderCalendar();
+    autoGrowAllMultilineFields();
   }
 
   // ---------- SETTINGS / SYNC ----------
@@ -859,6 +895,24 @@
   });
   settingsBackdrop.addEventListener("click", (e) => {
     if (e.target === settingsBackdrop) settingsBackdrop.classList.remove("open");
+  });
+
+  document.getElementById("exportDataBtn").addEventListener("click", () => {
+    try {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dispatch-backup-${todayISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("Backup downloaded.");
+    } catch (err) {
+      console.error(err);
+      toast("Couldn't create backup.");
+    }
   });
 
   document.getElementById("clearSyncBtn").addEventListener("click", () => {

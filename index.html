@@ -127,7 +127,7 @@
     border:solid var(--bg); border-width:0 2px 2px 0; transform:rotate(40deg);
   }
   .item-body{flex:1; min-width:0;}
-  .item-text{font-size:15.5px; line-height:1.4; word-break:break-word;}
+  .item-text{font-size:15.5px; line-height:1.4; word-break:break-word; white-space:pre-wrap;}
   .item.done .item-text{color:var(--text-faint); text-decoration:line-through; text-decoration-color:var(--ink-red); text-decoration-thickness:1.5px;}
   .item-meta{font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--text-faint); margin-top:3px; letter-spacing:0.03em;}
   .item-meta.overdue{color:var(--ink-red);}
@@ -143,11 +143,11 @@
   .item-edit:hover{color:var(--brass-bright);}
 
   .add-row{display:flex; gap:8px; margin-top:10px;}
-  .add-row input, .add-row select{
+  .add-row input, .add-row select, .add-row textarea{
     background:var(--surface2); border:1px solid var(--line); color:var(--text);
     border-radius:3px; padding:10px 12px; font-family:inherit; font-size:14.5px;
   }
-  .add-row input[type="text"]{flex:1; min-width:0;}
+  .add-row input[type="text"], .add-row textarea{flex:1; min-width:0; resize:vertical; min-height:42px;}
   .add-row input[type="date"], .add-row input[type="time"]{color-scheme:dark; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
   .btn{
     background:var(--brass); color:#0A1230; border:none; border-radius:3px;
@@ -318,7 +318,7 @@
     <div class="section-label">Reminders <span class="count" id="remindersCount"></span></div>
     <div class="card" id="remindersList"></div>
     <div class="add-row" style="flex-wrap:wrap;">
-      <input type="text" id="reminderInput" placeholder="Add a reminder…" maxlength="200" style="flex:1 1 100%;">
+      <textarea id="reminderInput" placeholder="Add a reminder…" maxlength="200" rows="1" style="flex:1 1 100%;" enterkeyhint="enter"></textarea>
     </div>
     <div class="add-row" style="margin-top:8px;">
       <input type="date" id="reminderDate">
@@ -329,7 +329,7 @@
     <div class="section-label" style="margin-top:32px;">Things to do <span class="count" id="shoppingCount"></span></div>
     <div class="card" id="shoppingList"></div>
     <div class="add-row">
-      <input type="text" id="shoppingInput" placeholder="Add an item…" maxlength="200">
+      <textarea id="shoppingInput" placeholder="Add an item…" maxlength="200" rows="1" enterkeyhint="enter"></textarea>
     </div>
     <button class="btn" id="addShoppingBtn" style="margin-top:8px;">Add</button>
   </section>
@@ -339,7 +339,7 @@
     <div class="section-label">Significant dates <span class="count" id="datesCount"></span></div>
     <div class="card" id="datesList"></div>
     <div class="add-row" style="flex-wrap:wrap;">
-      <input type="text" id="dateLabelInput" placeholder="What's the occasion?" maxlength="200" style="flex:1 1 100%;">
+      <textarea id="dateLabelInput" placeholder="What's the occasion?" maxlength="200" rows="1" style="flex:1 1 100%;" enterkeyhint="enter"></textarea>
     </div>
     <div class="add-row" style="margin-top:8px;">
       <input type="date" id="dateValueInput">
@@ -391,6 +391,12 @@
     <button class="modal-close" id="closeSettings" aria-label="Close">&times;</button>
     <h2>Sync settings</h2>
     <p class="hint">Data syncs to a private GitHub repo you own, via a personal access token stored only in this browser. It's never sent anywhere else. Leave blank to use this device only.</p>
+
+    <div class="field">
+      <label>Local backup</label>
+      <button class="btn ghost" id="exportDataBtn" type="button" style="width:100%;">Download backup (.json)</button>
+    </div>
+
     <div class="field">
       <label for="ghOwner">GitHub username</label>
       <input type="text" id="ghOwner" autocomplete="off" spellcheck="false" placeholder="e.g. juanromulus">
