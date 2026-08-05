@@ -143,7 +143,7 @@
     border-radius:3px; padding:10px 12px; font-family:inherit; font-size:14.5px;
   }
   .add-row input[type="text"]{flex:1; min-width:0;}
-  .add-row input[type="date"]{color-scheme:dark; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
+  .add-row input[type="date"], .add-row input[type="time"]{color-scheme:dark; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
   .btn{
     background:var(--brass); color:#0A1230; border:none; border-radius:3px;
     padding:10px 14px; font-family:'JetBrains Mono', monospace; font-size:11.5px;
@@ -271,9 +271,12 @@
   <section class="page" id="page-lists">
     <div class="section-label">Reminders <span class="count" id="remindersCount"></span></div>
     <div class="card" id="remindersList"></div>
-    <div class="add-row">
-      <input type="text" id="reminderInput" placeholder="Add a reminder…" maxlength="200">
+    <div class="add-row" style="flex-wrap:wrap;">
+      <input type="text" id="reminderInput" placeholder="Add a reminder…" maxlength="200" style="flex:1 1 100%;">
+    </div>
+    <div class="add-row" style="margin-top:8px;">
       <input type="date" id="reminderDate">
+      <input type="time" id="reminderTime">
     </div>
     <button class="btn" id="addReminderBtn" style="margin-top:8px;">File</button>
 

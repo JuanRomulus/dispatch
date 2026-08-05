@@ -11,11 +11,33 @@
   const SYNC_KEY = "dispatch_sync_v1";
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const todayISO = () => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 10);
-  };
+
+  // Local-timezone date formatting — deliberately NOT toISOString(), which
+  // converts to UTC and shifts the date backward for anyone east of
+  // Greenwich (e.g. Sydney), making "today" resolve to yesterday.
+  function toLocalISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const todayISO = () => toLocalISO(new Date());
+
+  // Combines a reminder's date + optional time into a real Date for
+  // precise overdue/due-today comparisons. Reminders with no time default
+  // to end-of-day, so they count as "due today" all day rather than
+  // going overdue at midnight.
+  function reminderMoment(r) {
+    if (!r.date) return null;
+    const time = r.time || "23:59";
+    return new Date(`${r.date}T${time}:00`);
+  }
+
+  function formatTime(hhmm) {
+    if (!hhmm) return "";
+    const d = new Date(`2000-01-01T${hhmm}:00`);
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
 
   // ---------- state ----------
   let state = loadState();
@@ -132,6 +154,7 @@
   const remindersCount = document.getElementById("remindersCount");
   const reminderInput = document.getElementById("reminderInput");
   const reminderDate = document.getElementById("reminderDate");
+  const reminderTime = document.getElementById("reminderTime");
 
   document.getElementById("addReminderBtn").addEventListener("click", addReminder);
   reminderInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addReminder(); });
@@ -143,10 +166,12 @@
       id: uid(),
       text,
       date: reminderDate.value || null,
+      time: reminderDate.value ? (reminderTime.value || null) : null,
       done: false,
     });
     reminderInput.value = "";
     reminderDate.value = "";
+    reminderTime.value = "";
     saveState();
     toast("Filed.");
   }
@@ -157,7 +182,11 @@
 
     const sorted = [...state.reminders].sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
-      if (a.date && b.date) return a.date.localeCompare(b.date);
+      if (a.date && b.date) {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.time || "").localeCompare(b.time || "");
+      }
       if (a.date) return -1;
       if (b.date) return 1;
       return 0;
@@ -168,12 +197,16 @@
       return;
     }
 
+    const now = new Date();
     remindersList.innerHTML = sorted.map((r) => {
-      const overdue = r.date && !r.done && daysBetween(r.date, todayISO()) > 0;
+      const moment = reminderMoment(r);
+      const overdue = !!moment && !r.done && moment < now;
       const isToday = r.date === todayISO();
       let meta = "";
       if (r.date) {
-        meta = overdue ? `overdue · ${fmtDate(r.date)}` : isToday ? "today" : fmtDate(r.date);
+        const dateLabel = overdue ? `overdue · ${fmtDate(r.date)}` : isToday ? "today" : fmtDate(r.date);
+        const timeLabel = r.time ? formatTime(r.time) : "";
+        meta = [dateLabel, timeLabel].filter(Boolean).join(" · ");
       }
       return `
         <div class="item ${r.done ? "done" : ""}" data-id="${r.id}">
@@ -365,9 +398,14 @@
 
   function renderToday() {
     const t = todayISO();
+    const now = new Date();
 
-    const overdue = state.reminders.filter((r) => !r.done && r.date && daysBetween(r.date, t) > 0);
-    const dueToday = state.reminders.filter((r) => !r.done && r.date === t);
+    const overdue = state.reminders
+      .filter((r) => !r.done && r.date && reminderMoment(r) < now)
+      .sort((a, b) => reminderMoment(a) - reminderMoment(b));
+    const dueToday = state.reminders
+      .filter((r) => !r.done && r.date === t && reminderMoment(r) >= now)
+      .sort((a, b) => reminderMoment(a) - reminderMoment(b));
     const upcomingDates = state.dates
       .map((d) => ({ ...d, _next: nextOccurrence(d) }))
       .filter((d) => daysBetween(t, d._next) >= 0 && daysBetween(t, d._next) <= 14)
@@ -412,7 +450,12 @@
   }
 
   function reminderRow(r, overdue) {
-    const meta = r.date ? (overdue ? `overdue · ${fmtDate(r.date)}` : "today") : "";
+    let meta = "";
+    if (r.date) {
+      const dateLabel = overdue ? `overdue · ${fmtDate(r.date)}` : "today";
+      const timeLabel = r.time ? formatTime(r.time) : "";
+      meta = [dateLabel, timeLabel].filter(Boolean).join(" · ");
+    }
     return `
       <div class="item" data-id="${r.id}">
         <button class="check" data-action="toggle-today-reminder" aria-label="Toggle done"></button>
