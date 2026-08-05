@@ -67,6 +67,14 @@
   }
 
   function autoGrowTextarea(el) {
+    // offsetParent is null when the element (or an ancestor) is
+    // display:none — e.g. it sits on a tab that isn't active right now.
+    // Measuring height in that state always returns 0, which would get
+    // baked in as a fixed inline height and collapse the field the next
+    // time its tab becomes visible. Skip it and leave sizing alone until
+    // it's actually on screen (the next render or input event will catch
+    // it correctly).
+    if (el.offsetParent === null) return;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
   }
@@ -158,6 +166,7 @@
   function showPage(name) {
     pages.forEach((p) => p.classList.toggle("active", p.id === `page-${name}`));
     tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.page === name));
+    autoGrowAllMultilineFields();
   }
 
   tabButtons.forEach((btn) => {
