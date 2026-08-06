@@ -111,6 +111,17 @@
   let state = loadState();
   let syncCfg = loadSyncCfg();
   let syncTimer = null;
+  let notifyCfg = loadNotifyCfg();
+
+  // Older saved data used a boolean `recurring` (yearly or nothing). New
+  // data uses `repeat`: "none" | "daily" | "weekly" | "biweekly" |
+  // "monthly" | "yearly". Migrate on the way in so old data keeps working.
+  function migrateDates(dates) {
+    return (dates || []).map((d) => {
+      if (d.repeat) return d;
+      return { ...d, repeat: d.recurring ? "yearly" : "none" };
+    });
+  }
 
   function loadState() {
     try {
@@ -120,7 +131,7 @@
       return {
         reminders: parsed.reminders || [],
         shopping: parsed.shopping || [],
-        dates: parsed.dates || [],
+        dates: migrateDates(parsed.dates),
         notes: parsed.notes || [],
       };
     } catch {
@@ -147,6 +158,21 @@
     syncCfg = cfg;
     if (cfg) localStorage.setItem(SYNC_KEY, JSON.stringify(cfg));
     else localStorage.removeItem(SYNC_KEY);
+  }
+
+  const NOTIFY_KEY = "dispatch_notify_v1";
+  function loadNotifyCfg() {
+    try {
+      const raw = localStorage.getItem(NOTIFY_KEY);
+      const cfg = raw ? JSON.parse(raw) : {};
+      return { enabled: !!cfg.enabled, leadMinutes: cfg.leadMinutes ?? 15 };
+    } catch {
+      return { enabled: false, leadMinutes: 15 };
+    }
+  }
+  function saveNotifyCfg(cfg) {
+    notifyCfg = cfg;
+    localStorage.setItem(NOTIFY_KEY, JSON.stringify(cfg));
   }
 
   // ---------- toast ----------
@@ -203,19 +229,92 @@
     return Math.round((b - a) / 86400000);
   }
 
-  // next occurrence of a "significant date" — if recurring, project into
-  // this year or next; if not recurring, use the date as-is.
+  function addDaysISO(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + n);
+    return toLocalISO(dt);
+  }
+
+  // Adds n months, clamping the day if the target month is shorter
+  // (e.g. the 31st + 1 month lands on the last day of a 30-day month).
+  function addMonthsISO(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(y, m - 1 + n, 1);
+    const daysInTargetMonth = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+    dt.setDate(Math.min(d, daysInTargetMonth));
+    return toLocalISO(dt);
+  }
+
+  const REPEAT_STEP_DAYS = { daily: 1, weekly: 7, biweekly: 14 };
+
+  // Next occurrence of a significant date, given its repeat interval.
+  // "none" is just the date itself; everything else projects forward from
+  // the original date to the next matching day on or after today.
   function nextOccurrence(dateItem) {
-    if (!dateItem.recurring) return dateItem.date;
-    const today = new Date();
-    const [, m, d] = dateItem.date.split("-").map(Number);
-    let year = today.getFullYear();
-    let candidate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    if (daysBetween(todayISO(), candidate) < 0) {
-      year += 1;
-      candidate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const repeat = dateItem.repeat || "none";
+    const today = todayISO();
+
+    if (repeat === "none") return dateItem.date;
+
+    if (repeat === "yearly") {
+      const [, m, d] = dateItem.date.split("-").map(Number);
+      let year = new Date().getFullYear();
+      let candidate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      if (daysBetween(today, candidate) < 0) {
+        year += 1;
+        candidate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      }
+      return candidate;
     }
-    return candidate;
+
+    if (repeat === "monthly") {
+      if (daysBetween(today, dateItem.date) >= 0) return dateItem.date; // hasn't started yet
+      const [sy, sm] = dateItem.date.split("-").map(Number);
+      const [ty, tm] = today.split("-").map(Number);
+      let n = Math.max(0, (ty - sy) * 12 + (tm - sm));
+      let candidate = addMonthsISO(dateItem.date, n);
+      while (daysBetween(today, candidate) < 0) {
+        n += 1;
+        candidate = addMonthsISO(dateItem.date, n);
+      }
+      return candidate;
+    }
+
+    // daily / weekly / biweekly
+    const step = REPEAT_STEP_DAYS[repeat];
+    if (!step) return dateItem.date;
+    if (daysBetween(today, dateItem.date) >= 0) return dateItem.date; // hasn't started yet
+    const sinceStart = daysBetween(dateItem.date, today);
+    const n = Math.ceil(sinceStart / step);
+    return addDaysISO(dateItem.date, n * step);
+  }
+
+  // Whether a significant date falls on a specific calendar day, given its
+  // repeat interval — used by the Calendar tab's day-by-day grid.
+  function dateOccursOn(dateItem, iso) {
+    const repeat = dateItem.repeat || "none";
+
+    if (repeat === "none") return dateItem.date === iso;
+
+    if (repeat === "yearly") {
+      const [, m, d] = dateItem.date.split("-");
+      const [, im, iday] = iso.split("-");
+      return m === im && d === iday;
+    }
+
+    if (daysBetween(dateItem.date, iso) < 0) return false; // before it started
+
+    if (repeat === "monthly") {
+      const [sy, sm, sd] = dateItem.date.split("-").map(Number);
+      const [iy, im, id] = iso.split("-").map(Number);
+      const daysInTargetMonth = new Date(iy, im, 0).getDate();
+      return id === Math.min(sd, daysInTargetMonth);
+    }
+
+    const step = REPEAT_STEP_DAYS[repeat];
+    if (!step) return false;
+    return daysBetween(dateItem.date, iso) % step === 0;
   }
 
   // ---------- REMINDERS ----------
@@ -439,7 +538,25 @@
   const dateLabelInput = document.getElementById("dateLabelInput");
   const dateValueInput = document.getElementById("dateValueInput");
   const dateTimeInput = document.getElementById("dateTimeInput");
-  const dateRecurring = document.getElementById("dateRecurring");
+  const dateRepeatSelect = document.getElementById("dateRepeat");
+
+  const REPEAT_OPTIONS = [
+    { value: "none", label: "Doesn't repeat" },
+    { value: "daily", label: "Every day" },
+    { value: "weekly", label: "Every week" },
+    { value: "biweekly", label: "Every 2 weeks" },
+    { value: "monthly", label: "Every month" },
+    { value: "yearly", label: "Every year" },
+  ];
+  const REPEAT_META_LABEL = {
+    daily: "daily", weekly: "weekly", biweekly: "every 2 weeks", monthly: "monthly", yearly: "yearly",
+  };
+
+  function repeatSelectOptionsHtml(selected) {
+    return REPEAT_OPTIONS.map(
+      (o) => `<option value="${o.value}" ${o.value === selected ? "selected" : ""}>${o.label}</option>`
+    ).join("");
+  }
 
   document.getElementById("addDateBtn").addEventListener("click", addDate);
 
@@ -452,12 +569,12 @@
       label,
       date: value,
       time: dateTimeInput.value || null,
-      recurring: dateRecurring.checked,
+      repeat: dateRepeatSelect.value,
     });
     dateLabelInput.value = "";
     dateValueInput.value = "";
     dateTimeInput.value = "";
-    dateRecurring.checked = true;
+    dateRepeatSelect.value = "yearly";
     saveState();
     toast("Marked.");
   }
@@ -488,10 +605,7 @@
                 <input type="time" class="edit-time-input" value="${d.time || ""}">
               </div>
               <div class="add-row" style="margin-top:8px;">
-                <div class="recur-toggle">
-                  <input type="checkbox" class="edit-recurring-input" ${d.recurring ? "checked" : ""}>
-                  <label>Repeats yearly</label>
-                </div>
+                <select class="edit-repeat-input" style="flex:1;">${repeatSelectOptionsHtml(d.repeat || "none")}</select>
               </div>
               <div class="note-actions" style="margin-top:8px;">
                 <button data-action="save-date">Save</button>
@@ -507,7 +621,8 @@
       else if (days === 1) meta = "tomorrow";
       else meta = `in ${days} days · ${fmtDate(d._next)}`;
       const timeLabel = d.time ? formatTime(d.time) : "";
-      const fullMeta = [meta, timeLabel, d.recurring ? "yearly" : ""].filter(Boolean).join(" · ");
+      const repeatLabel = REPEAT_META_LABEL[d.repeat] || "";
+      const fullMeta = [meta, timeLabel, repeatLabel].filter(Boolean).join(" · ");
       return `
         <div class="item" data-id="${d.id}">
           <div class="item-body">
@@ -541,14 +656,14 @@
       const label = item.querySelector(".edit-text-input").value.trim();
       const dateVal = item.querySelector(".edit-date-input").value;
       const timeVal = item.querySelector(".edit-time-input").value;
-      const recurring = item.querySelector(".edit-recurring-input").checked;
+      const repeatVal = item.querySelector(".edit-repeat-input").value;
       if (label && dateVal) {
         const d = state.dates.find((x) => x.id === id);
         if (d) {
           d.label = label;
           d.date = dateVal;
           d.time = timeVal || null;
-          d.recurring = recurring;
+          d.repeat = repeatVal;
         }
       }
       editingDateId = null;
@@ -749,15 +864,8 @@
   });
 
   function itemsForDay(iso) {
-    const [, im, iday] = iso.split("-");
     const reminders = state.reminders.filter((r) => r.date === iso);
-    const dates = state.dates.filter((d) => {
-      if (d.recurring) {
-        const [, m, day] = d.date.split("-");
-        return m === im && day === iday;
-      }
-      return d.date === iso;
-    });
+    const dates = state.dates.filter((d) => dateOccursOn(d, iso));
     return { reminders, dates };
   }
 
@@ -838,7 +946,8 @@
 
     dates.forEach((dt) => {
       const timeLabel = dt.time ? formatTime(dt.time) : "";
-      const meta = [timeLabel, dt.recurring ? "yearly" : ""].filter(Boolean).join(" · ");
+      const repeatLabel = REPEAT_META_LABEL[dt.repeat] || "";
+      const meta = [timeLabel, repeatLabel].filter(Boolean).join(" · ");
       rows.push(`
         <div class="item">
           <div class="item-body">
@@ -888,6 +997,8 @@
   const ghRepo = document.getElementById("ghRepo");
   const ghPath = document.getElementById("ghPath");
   const ghToken = document.getElementById("ghToken");
+  const notifyEnabled = document.getElementById("notifyEnabled");
+  const notifyLead = document.getElementById("notifyLead");
 
   syncIndicator.addEventListener("click", () => {
     if (syncCfg) {
@@ -896,8 +1007,112 @@
       ghPath.value = syncCfg.path || "data.json";
       ghToken.value = syncCfg.token || "";
     }
+    notifyEnabled.checked = notifyCfg.enabled;
+    notifyLead.value = String(notifyCfg.leadMinutes);
     settingsBackdrop.classList.add("open");
   });
+
+  // ---------- ALERTS (in-app only, while the app is open) ----------
+  // There is no server behind Dispatch, so there is no way to wake the
+  // phone when the app is closed — that would require a push service.
+  // This deliberately stays local-only: nothing about a reminder or date
+  // ever leaves the device for this feature.
+  function showAlert(title, body) {
+    const options = { body, icon: "./icon-192.png", badge: "./icon-192.png", tag: title };
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready
+        .then((reg) => reg.showNotification(title, options))
+        .catch(() => {
+          try { new Notification(title, options); } catch { /* unsupported */ }
+        });
+    } else {
+      try { new Notification(title, options); } catch { /* unsupported */ }
+    }
+  }
+
+  notifyEnabled.addEventListener("change", async () => {
+    if (!notifyEnabled.checked) {
+      saveNotifyCfg({ ...notifyCfg, enabled: false });
+      toast("Alerts off.");
+      return;
+    }
+    if (!("Notification" in window)) {
+      toast("This browser doesn't support alerts.");
+      notifyEnabled.checked = false;
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      toast("Alerts need permission — check your phone's notification settings for Dispatch.");
+      notifyEnabled.checked = false;
+      return;
+    }
+    saveNotifyCfg({ ...notifyCfg, enabled: true });
+    toast("Alerts on.");
+  });
+
+  notifyLead.addEventListener("change", () => {
+    saveNotifyCfg({ ...notifyCfg, leadMinutes: Number(notifyLead.value) });
+  });
+
+  document.getElementById("testNotifyBtn").addEventListener("click", async () => {
+    if (!("Notification" in window)) {
+      toast("This browser doesn't support alerts.");
+      return;
+    }
+    let perm = Notification.permission;
+    if (perm === "default") perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      toast("Permission not granted — check your phone's notification settings for Dispatch.");
+      return;
+    }
+    showAlert("Dispatch", "This is a test alert — if you can see this, alerts are working.");
+  });
+
+  // Tracks which specific occurrences we've already alerted on this
+  // session, so a repeated check every ~20s doesn't fire the same alert
+  // over and over. Deliberately in-memory only (resets on reload) — this
+  // whole feature only works while the app is open anyway.
+  const alertedKeys = new Set();
+
+  function checkDueAlerts() {
+    if (!notifyCfg.enabled) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    const now = new Date();
+    const leadMs = notifyCfg.leadMinutes * 60000;
+    const graceMs = 60000; // don't alert on things that became due more than a minute ago
+
+    state.reminders.forEach((r) => {
+      if (r.done || !r.date || !r.time) return;
+      const moment = reminderMoment(r);
+      if (!moment) return;
+      const diff = moment - now;
+      if (diff > leadMs || diff < -graceMs) return;
+      const key = `reminder:${r.id}:${r.date}:${r.time}`;
+      if (alertedKeys.has(key)) return;
+      alertedKeys.add(key);
+      const when = notifyCfg.leadMinutes > 0 && diff > 0 ? ` (in ${notifyCfg.leadMinutes} min)` : "";
+      showAlert("Reminder" + when, r.text);
+    });
+
+    state.dates.forEach((d) => {
+      if (!d.time) return;
+      const next = nextOccurrence(d);
+      if (!next) return;
+      const moment = new Date(`${next}T${d.time}:00`);
+      const diff = moment - now;
+      if (diff > leadMs || diff < -graceMs) return;
+      const key = `date:${d.id}:${next}:${d.time}`;
+      if (alertedKeys.has(key)) return;
+      alertedKeys.add(key);
+      const when = notifyCfg.leadMinutes > 0 && diff > 0 ? ` (in ${notifyCfg.leadMinutes} min)` : "";
+      showAlert("Significant date" + when, d.label);
+    });
+  }
+
+  checkDueAlerts();
+  setInterval(checkDueAlerts, 20000);
 
   document.getElementById("closeSettings").addEventListener("click", () => {
     settingsBackdrop.classList.remove("open");
@@ -1003,7 +1218,7 @@
         state = {
           reminders: decoded.reminders || [],
           shopping: decoded.shopping || [],
-          dates: decoded.dates || [],
+          dates: migrateDates(decoded.dates),
           notes: decoded.notes || [],
         };
         localStorage.setItem(DATA_KEY, JSON.stringify(state));

@@ -346,10 +346,14 @@
       <input type="time" id="dateTimeInput">
     </div>
     <div class="add-row" style="margin-top:8px;">
-      <div class="recur-toggle">
-        <input type="checkbox" id="dateRecurring" checked>
-        <label for="dateRecurring">Repeats yearly</label>
-      </div>
+      <select id="dateRepeat" style="flex:1;">
+        <option value="none">Doesn't repeat</option>
+        <option value="daily">Every day</option>
+        <option value="weekly">Every week</option>
+        <option value="biweekly">Every 2 weeks</option>
+        <option value="monthly">Every month</option>
+        <option value="yearly" selected>Every year</option>
+      </select>
     </div>
     <button class="btn" id="addDateBtn" style="margin-top:8px;">Mark it</button>
   </section>
@@ -389,13 +393,37 @@
 <div class="modal-backdrop" id="settingsBackdrop">
   <div class="modal">
     <button class="modal-close" id="closeSettings" aria-label="Close">&times;</button>
-    <h2>Sync settings</h2>
-    <p class="hint">Data syncs to a private GitHub repo you own, via a personal access token stored only in this browser. It's never sent anywhere else. Leave blank to use this device only.</p>
+    <h2>Settings</h2>
 
     <div class="field">
       <label>Local backup</label>
       <button class="btn ghost" id="exportDataBtn" type="button" style="width:100%;">Download backup (.json)</button>
     </div>
+
+    <div class="section-label" style="margin-top:22px;">Alerts</div>
+    <p class="hint">Notifies you while Dispatch is open on this device — nothing is sent anywhere, and nothing fires once the app is closed. Only reminders and significant dates with a time set can alert.</p>
+    <div class="field">
+      <div class="recur-toggle">
+        <input type="checkbox" id="notifyEnabled">
+        <label for="notifyEnabled">Enable alerts</label>
+      </div>
+    </div>
+    <div class="field">
+      <label for="notifyLead">Alert me</label>
+      <select id="notifyLead">
+        <option value="0">Right at the time</option>
+        <option value="5">5 minutes before</option>
+        <option value="15" selected>15 minutes before</option>
+        <option value="30">30 minutes before</option>
+        <option value="60">1 hour before</option>
+      </select>
+    </div>
+    <div class="field">
+      <button class="btn ghost" id="testNotifyBtn" type="button" style="width:100%;">Send a test alert</button>
+    </div>
+
+    <div class="section-label" style="margin-top:22px;">GitHub sync</div>
+    <p class="hint">Data syncs to a private GitHub repo you own, via a personal access token stored only in this browser. It's never sent anywhere else. Leave blank to use this device only.</p>
 
     <div class="field">
       <label for="ghOwner">GitHub username</label>
