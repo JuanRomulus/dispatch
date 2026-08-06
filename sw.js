@@ -1,6 +1,6 @@
 // Dispatch service worker — network-first, falls back to cache when offline.
 // Bump CACHE_NAME whenever app files change to force a refresh.
-const CACHE_NAME = "dispatch-v18";
+const CACHE_NAME = "dispatch-v19";
 const ASSETS = [
   "./",
   "./index.html",
