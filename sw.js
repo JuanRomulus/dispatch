@@ -1,6 +1,6 @@
 // Dispatch service worker — network-first, falls back to cache when offline.
 // Bump CACHE_NAME whenever app files change to force a refresh.
-const CACHE_NAME = "dispatch-v13";
+const CACHE_NAME = "dispatch-v14";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
+  "./archer.webp",
 ];
 
 self.addEventListener("install", (event) => {

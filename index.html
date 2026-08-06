@@ -94,6 +94,7 @@
   main{padding:16px 18px 40px; max-width:640px; margin:0 auto;}
   .page{display:none;}
   .page.active{display:block; animation:rise 0.25s ease;}
+  #page-home.active{display:flex; flex-direction:column; justify-content:center; min-height:calc(100dvh - 220px);}
   @keyframes rise{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
 
   .section-label{
@@ -214,6 +215,18 @@
   .cal-dot.reminder{background:var(--brass-bright);}
   .cal-dot.date{background:var(--sage);}
 
+  .home-hero{
+    margin:-16px -18px 0;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+    background:radial-gradient(ellipse 70% 55% at 50% 30%, rgba(242,199,68,0.10), transparent 70%);
+    padding:28px 0 12px;
+  }
+  .home-hero-img{
+    width:100%; max-width:540px; height:auto; display:block;
+    filter:drop-shadow(0 18px 36px rgba(0,0,0,0.55));
+  }
+
   footer.tabbar{
     position:fixed; bottom:0; left:0; right:0; z-index:20;
     background:var(--surface); border-top:1px solid var(--line);
@@ -288,6 +301,7 @@
     <span id="datelinePlace">—</span><span class="rule"></span><span id="datelineDate">—</span>
   </div>
   <nav class="tabs" id="tabsNav">
+    <button data-page="home">Home</button>
     <button data-page="today" class="active">Today</button>
     <button data-page="calendar">Calendar</button>
     <button data-page="lists">Lists</button>
@@ -297,6 +311,13 @@
 </header>
 
 <main>
+  <!-- HOME -->
+  <section class="page" id="page-home">
+    <div class="home-hero">
+      <img src="archer.webp" alt="" class="home-hero-img">
+    </div>
+  </section>
+
   <!-- TODAY -->
   <section class="page active" id="page-today"></section>
 
@@ -368,6 +389,10 @@
 </main>
 
 <footer class="tabbar" id="tabbarBottom">
+  <button data-page="home">
+    <svg viewBox="0 0 24 24"><path d="M7 3c6 3.5 6 17.5 0 21"/><path d="M2 12.5h15"/><path d="M14 9l3.5 3.5L14 16"/></svg>
+    Home
+  </button>
   <button data-page="today" class="active">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
     Today
